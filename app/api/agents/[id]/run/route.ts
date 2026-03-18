@@ -96,7 +96,8 @@ export async function POST(
     if (agent.price_xlm > 0 && !paymentTxHash) {
       // Issue 402 payment challenge
       const requestNonce = Math.random().toString(36).slice(2, 10);
-      const memo = `agent:${agentId}:req:${requestNonce}`;
+      // Memo is capped at 28 bytes to match Stellar's limit (same cap applied in PaymentModal)
+      const memo = `agent:${agentId}:req:${requestNonce}`.slice(0, 28);
 
       return NextResponse.json(
         {

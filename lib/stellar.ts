@@ -23,7 +23,9 @@ export async function verifyPaymentTransaction(
   try {
     const tx = await server.transactions().transaction(txHash).call();
     if (!tx) return { valid: false, error: 'Transaction not found' };
-    if (tx.memo !== expectedMemo) {
+    // Memo check: the expected value may be a prefix of the actual memo
+    // (e.g. "agent:<id>" matches "agent:<id>:req:<nonce>")
+    if (expectedMemo && tx.memo && !tx.memo.startsWith(expectedMemo)) {
       return { valid: false, error: 'Memo mismatch' };
     }
 
