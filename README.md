@@ -1,6 +1,6 @@
-# AgentForge
+# Xylem
 
-**AgentForge** is a Web3-native AI agent marketplace and builder platform on the Stellar blockchain.
+**Xylem** is a Web3-native AI agent marketplace and builder platform on the Stellar blockchain.
 
 ## Overview
 
