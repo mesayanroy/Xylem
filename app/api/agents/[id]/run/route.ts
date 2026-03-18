@@ -122,19 +122,49 @@ export async function POST(
       );
     }
 
-    // Verify payment if hash provided
-    let paymentVerified = agent.price_xlm === 0;
+    const requestId = uuidv4();
+
+    // If a payment hash is provided, hand off to the async PubSub pipeline and
+    // return 202 Accepted so the caller knows to listen for the result via Ably.
     if (paymentTxHash && agent.price_xlm > 0) {
-      paymentVerified = await verifyPayment(paymentTxHash, agent.owner_wallet, agent.price_xlm, agentId);
+      try {
+        const { publish, TOPICS } = await import('@/lib/kafka');
+
+        await publish(TOPICS.PAYMENT_PENDING, {
+          requestId,
+          agentId,
+          txHash: paymentTxHash,
+          callerWallet,
+          ownerWallet: agent.owner_wallet,
+          priceXlm: agent.price_xlm,
+          memo: `agent:${agentId}`,
+          input,
+          createdAt: new Date().toISOString(),
+        });
+
+        return NextResponse.json(
+          {
+            request_id: requestId,
+            status: 'pending',
+            message: 'Payment received. Subscribe to Ably channel "marketplace" for the result.',
+          },
+          { status: 202 }
+        );
+      } catch (kafkaErr) {
+        // Kafka not configured – fall through to synchronous execution
+        console.warn('[run] Kafka unavailable, falling back to synchronous execution:', kafkaErr);
+      }
+
+      // Synchronous fallback: verify and run inline
+      const paymentVerified = await verifyPayment(paymentTxHash, agent.owner_wallet, agent.price_xlm, agentId);
       if (!paymentVerified) {
         return NextResponse.json({ error: 'Payment verification failed' }, { status: 402 });
       }
     }
 
-    // Run the agent
+    // Free agent (price_xlm === 0) or synchronous fallback path
     const output = await runAgentModel(agent.model, agent.system_prompt, input);
     const latencyMs = Date.now() - startTime;
-    const requestId = uuidv4();
 
     // Log to database
     if (supabaseUrl && supabaseServiceKey) {
