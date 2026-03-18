@@ -9,6 +9,79 @@ export const server = new StellarSdk.Horizon.Server(HORIZON_URL);
 
 export { NETWORK_PASSPHRASE };
 
+// ─── Horizon SSE watcher ──────────────────────────────────────────────────────
+
+export type TxWatcherCallback = (tx: StellarSdk.Horizon.ServerApi.TransactionRecord) => void;
+
+/**
+ * Open a Horizon Server-Sent Events stream for a specific account and call
+ * `onTransaction` for every new transaction that arrives.
+ *
+ * Returns a `close` function that stops the stream.
+ *
+ * @param accountAddress  Stellar account to watch.
+ * @param onTransaction   Called with each new transaction record.
+ * @param cursor          Starting cursor (default: "now" to only get new txs).
+ */
+export function watchAccountTransactions(
+  accountAddress: string,
+  onTransaction: TxWatcherCallback,
+  cursor = 'now'
+): () => void {
+  const close = server
+    .transactions()
+    .forAccount(accountAddress)
+    .cursor(cursor)
+    .stream({
+      onmessage: (tx) => {
+        try {
+          onTransaction(tx as StellarSdk.Horizon.ServerApi.TransactionRecord);
+        } catch (err) {
+          console.error('[Horizon SSE] onmessage handler error:', err);
+        }
+      },
+      onerror: (err) => {
+        console.error('[Horizon SSE] stream error:', err);
+      },
+    });
+
+  return close;
+}
+
+/**
+ * Poll Horizon for a specific transaction hash and resolve once it appears
+ * on the ledger (or reject after `timeoutMs`).
+ */
+export function waitForTransaction(
+  txHash: string,
+  timeoutMs = 60_000
+): Promise<StellarSdk.Horizon.ServerApi.TransactionRecord> {
+  return new Promise((resolve, reject) => {
+    const deadline = Date.now() + timeoutMs;
+
+    async function poll(): Promise<void> {
+      try {
+        const tx = await server.transactions().transaction(txHash).call();
+        if (tx) {
+          resolve(tx);
+          return;
+        }
+      } catch {
+        // not yet on ledger
+      }
+
+      if (Date.now() >= deadline) {
+        reject(new Error(`Transaction ${txHash} not found within ${timeoutMs}ms`));
+        return;
+      }
+
+      setTimeout(() => void poll(), 3_000);
+    }
+
+    void poll();
+  });
+}
+
 export function truncateAddress(address: string, chars = 4): string {
   if (!address || address.length <= chars * 2 + 3) return address;
   return `${address.slice(0, chars + 1)}...${address.slice(-chars)}`;
