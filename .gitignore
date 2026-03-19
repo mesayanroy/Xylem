@@ -36,3 +36,6 @@ next-env.d.ts
 
 # rust build artifacts
 contracts/agent_registry/target/
+
+# Rust build artifacts
+agents-sdk/target/

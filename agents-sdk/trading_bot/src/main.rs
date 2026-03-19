@@ -6,6 +6,14 @@
 //! - **Short** — synthetic short via borrow-equivalent: sell an asset you
 //!               hold for XLM, wait for price drop, repurchase cheaper.
 //!
+//! ## 0x402 Protocol
+//! Enriches price feeds with paid off-chain data via [`common::PaymentClient`]
+//! when `PRICE_FEED_AGENT_URL` is set.
+//!
+//! ## Pub-Sub
+//! Every order fill publishes to `agentforge.agent.completed` so billing
+//! and the dashboard are updated in real time.
+//!
 //! ## Usage
 //! ```
 //! cp .env.template .env
@@ -18,7 +26,7 @@ mod orders;
 mod strategy;
 
 use anyhow::Result;
-use common::{HorizonClient, Keypair};
+use common::{HorizonClient, KafkaPublisher, Keypair, PaymentClient};
 use tracing::info;
 
 #[tokio::main]
@@ -38,10 +46,17 @@ async fn main() -> Result<()> {
         "Trading Bot starting"
     );
 
-    let horizon = HorizonClient::new(&cfg.common.horizon_url)?;
-    let keypair = Keypair::from_secret(&cfg.common.agent_secret)?;
+    let horizon  = HorizonClient::new(&cfg.common.horizon_url)?;
+    let keypair  = Keypair::from_secret(&cfg.common.agent_secret)?;
+    let _payment = PaymentClient::new(
+        keypair.clone(),
+        &cfg.common.horizon_url,
+        &cfg.common.network_passphrase,
+    )?;
+    let kafka    = KafkaPublisher::from_env();
 
     info!(address = %keypair.public_key, "Wallet loaded");
+    info!("0x402 + Kafka enabled for real-time billing and price intelligence");
 
-    strategy::run(&cfg, &horizon, &keypair).await
+    strategy::run(&cfg, &horizon, &keypair, &kafka).await
 }

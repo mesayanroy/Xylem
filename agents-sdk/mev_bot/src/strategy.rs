@@ -14,14 +14,12 @@
 //!   can be submitted back-to-back with minimal latency.
 
 use crate::{
-    config::{MevBotConfig, TradingPair},
+    config::MevBotConfig,
     executor,
 };
 use anyhow::Result;
 use common::{HorizonClient, Keypair, OrderBook};
 use rust_decimal::prelude::ToPrimitive;
-use rust_decimal::Decimal;
-use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{debug, info, warn};
@@ -48,9 +46,11 @@ pub struct Opportunity {
 
 /// Main scan loop — polls order books and fires trades on detected opportunities.
 pub async fn scan_loop(
-    cfg: &MevBotConfig,
-    horizon: &HorizonClient,
-    keypair: &Keypair,
+    cfg:            &MevBotConfig,
+    horizon:        &HorizonClient,
+    keypair:        &Keypair,
+    _payment_client: &common::PaymentClient,
+    kafka:          &common::KafkaPublisher,
 ) -> Result<()> {
     let interval = Duration::from_millis(cfg.poll_interval_ms);
     let mut consecutive_errors: u32 = 0;
@@ -63,7 +63,7 @@ pub async fn scan_loop(
     );
 
     loop {
-        match scan_once(cfg, horizon, keypair).await {
+        match scan_once(cfg, horizon, keypair, kafka).await {
             Ok(opportunities_taken) => {
                 if opportunities_taken > 0 {
                     info!("{opportunities_taken} MEV opportunit(ies) executed this cycle");
@@ -86,10 +86,13 @@ pub async fn scan_loop(
 ///
 /// Returns the number of opportunities that were executed.
 async fn scan_once(
-    cfg: &MevBotConfig,
+    cfg:     &MevBotConfig,
     horizon: &HorizonClient,
     keypair: &Keypair,
+    kafka:   &common::KafkaPublisher,
 ) -> Result<u32> {
+    use common::pubsub::{now_iso, AgentActionEvent};
+
     let mut executed = 0u32;
 
     // Fetch all order books in parallel for minimum latency.
@@ -126,6 +129,20 @@ async fn scan_once(
                     match executor::execute(cfg, horizon, keypair, &opp, i).await {
                         Ok(hash) => {
                             info!(tx = %hash, profit = opp.estimated_profit, "MEV trade submitted");
+
+                            // Publish the trade event to Kafka so the AgentForge
+                            // dashboard and billing system reflect the earnings.
+                            kafka.publish_action(&AgentActionEvent {
+                                agent_type:   "mev_bot".into(),
+                                agent_wallet: keypair.public_key.clone(),
+                                action:       if opp.buy_pressure { "front_buy" } else { "front_sell" }.into(),
+                                asset_pair:   cfg.pairs.get(i).map(|p| format!("{}/{}", p.sell_asset, p.buy_asset)),
+                                tx_hash:      Some(hash),
+                                profit_xlm:   Some(opp.estimated_profit),
+                                latency_ms:   None,
+                                created_at:   now_iso(),
+                            }).await;
+
                             executed += 1;
                         }
                         Err(e) => warn!("Execution failed: {e:#}"),

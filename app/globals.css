@@ -2,18 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Font definitions with system fallbacks */
+/* ── Design tokens ──────────────────────────────────────────────────────────── */
 :root {
+  /* Fonts */
   --font-syne: 'Syne', 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+
+  /* Brand palette */
+  --color-teal:       #00FFE5;
+  --color-teal-dim:   rgba(0, 255, 229, 0.08);
+  --color-teal-glow:  rgba(0, 255, 229, 0.18);
+  --color-violet:     #7b61ff;
+  --color-violet-dim: rgba(123, 97, 255, 0.08);
+  --color-amber:      #f59e0b;
+  --color-green:      #4ade80;
+  --color-surface:    #0b0b10;
+  --color-bg:         #050508;
+
+  /* Spacing */
+  --header-h: 64px;
+}
+
+/* ── Base ───────────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 body {
-  background-color: #050508;
+  background-color: var(--color-bg);
   color: #ffffff;
   font-family: var(--font-syne);
+  overflow-x: hidden;
 }
 
+/* ── Utility font helpers ────────────────────────────────────────────────────── */
 .font-syne {
   font-family: var(--font-syne);
 }
@@ -22,25 +52,115 @@ body {
   font-family: var(--font-mono) !important;
 }
 
-/* Custom scrollbar */
+/* ── Custom scrollbar ────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: #0a0a10;
+  background: #08080e;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 255, 229, 0.2);
-  border-radius: 3px;
+  background: rgba(0, 255, 229, 0.18);
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 255, 229, 0.4);
+  background: rgba(0, 255, 229, 0.35);
 }
 
-/* Grid background texture */
+/* ── Grid background texture ─────────────────────────────────────────────────── */
 .grid-bg {
   background-image:
     linear-gradient(rgba(0, 255, 229, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0, 255, 229, 0.03) 1px, transparent 1px);
-  background-size: 50px 50px;
+  background-size: 52px 52px;
+}
+
+/* ── Glassmorphism card ───────────────────────────────────────────────────────── */
+.glass-card {
+  background:   rgba(255, 255, 255, 0.025);
+  backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4) inset,
+    0 24px 48px -12px rgba(0, 0, 0, 0.5);
+}
+
+.glass-card:hover {
+  border-color: rgba(0, 255, 229, 0.12);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4) inset,
+    0 24px 64px -12px rgba(0, 0, 0, 0.6),
+    0 0 40px -10px rgba(0, 255, 229, 0.08);
+}
+
+/* ── Glow utilities ──────────────────────────────────────────────────────────── */
+.glow-teal {
+  box-shadow: 0 0 32px -4px rgba(0, 255, 229, 0.35);
+}
+
+.glow-violet {
+  box-shadow: 0 0 32px -4px rgba(123, 97, 255, 0.35);
+}
+
+.text-glow-teal {
+  text-shadow: 0 0 24px rgba(0, 255, 229, 0.6);
+}
+
+/* ── Gradient text helpers ────────────────────────────────────────────────────── */
+.gradient-text-teal {
+  background: linear-gradient(135deg, #00FFE5, #7b61ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Shimmer loading skeleton ──────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.03) 25%,
+    rgba(255,255,255,0.07) 50%,
+    rgba(255,255,255,0.03) 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* ── Status indicator ──────────────────────────────────────────────────────── */
+.status-live::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-teal);
+  margin-right: 6px;
+  box-shadow: 0 0 6px var(--color-teal);
+  animation: pulse-ring 1.4s ease-out infinite;
+}
+
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(0,255,229,0.6); }
+  70%  { box-shadow: 0 0 0 6px rgba(0,255,229,0); }
+  100% { box-shadow: 0 0 0 0 rgba(0,255,229,0); }
+}
+
+/* ── Three.js canvas sizing ───────────────────────────────────────────────── */
+canvas {
+  display: block;
+  outline: none;
+}
+
+/* ── Focus visible ────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-teal);
+  outline-offset: 2px;
+  border-radius: 4px;
 }

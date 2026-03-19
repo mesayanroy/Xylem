@@ -8,7 +8,7 @@ use crate::{
     orders,
 };
 use anyhow::Result;
-use common::{HorizonClient, Keypair};
+use common::{AgentActionEvent, HorizonClient, KafkaPublisher, Keypair};
 use rust_decimal::prelude::ToPrimitive;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -18,13 +18,14 @@ pub async fn run(
     cfg:     &TradingBotConfig,
     horizon: &HorizonClient,
     keypair: &Keypair,
+    kafka:   &KafkaPublisher,
 ) -> Result<()> {
     match cfg.active_strategy {
-        Strategy::Buy   => run_buy(cfg, horizon, keypair).await,
-        Strategy::Sell  => run_sell(cfg, horizon, keypair).await,
-        Strategy::Short => run_short(cfg, horizon, keypair).await,
-        Strategy::Grid  => run_grid(cfg, horizon, keypair).await,
-        Strategy::Dca   => run_dca(cfg, horizon, keypair).await,
+        Strategy::Buy   => run_buy(cfg, horizon, keypair, kafka).await,
+        Strategy::Sell  => run_sell(cfg, horizon, keypair, kafka).await,
+        Strategy::Short => run_short(cfg, horizon, keypair, kafka).await,
+        Strategy::Grid  => run_grid(cfg, horizon, keypair, kafka).await,
+        Strategy::Dca   => run_dca(cfg, horizon, keypair, kafka).await,
     }
 }
 
@@ -38,6 +39,7 @@ async fn run_buy(
     cfg:     &TradingBotConfig,
     horizon: &HorizonClient,
     keypair: &Keypair,
+    kafka:   &KafkaPublisher,
 ) -> Result<()> {
     let ob = horizon.get_order_book(&cfg.trade_asset, &common::Asset::native(), 5).await?;
 
@@ -65,6 +67,16 @@ async fn run_buy(
 
     let hash = orders::place_buy_offer(cfg, horizon, keypair, price).await?;
     info!(tx = %hash, "Buy order placed");
+    kafka.publish_action(&AgentActionEvent {
+        agent_type:   "trading_bot".into(),
+        agent_wallet: keypair.public_key.clone(),
+        action:       "Buy_order".into(),
+        asset_pair:   Some(format!("{}", cfg.trade_asset)),
+        tx_hash:      Some(hash),
+        profit_xlm:   None,
+        latency_ms:   None,
+        created_at:   common::pubsub::now_iso(),
+    }).await;
     Ok(())
 }
 
@@ -74,6 +86,7 @@ async fn run_sell(
     cfg:     &TradingBotConfig,
     horizon: &HorizonClient,
     keypair: &Keypair,
+    kafka:   &KafkaPublisher,
 ) -> Result<()> {
     let ob = horizon.get_order_book(&cfg.trade_asset, &common::Asset::native(), 5).await?;
 
@@ -99,6 +112,16 @@ async fn run_sell(
 
     let hash = orders::place_sell_offer(cfg, horizon, keypair, price).await?;
     info!(tx = %hash, "Sell order placed");
+    kafka.publish_action(&AgentActionEvent {
+        agent_type:   "trading_bot".into(),
+        agent_wallet: keypair.public_key.clone(),
+        action:       "Sell_order".into(),
+        asset_pair:   Some(format!("{}", cfg.trade_asset)),
+        tx_hash:      Some(hash),
+        profit_xlm:   None,
+        latency_ms:   None,
+        created_at:   common::pubsub::now_iso(),
+    }).await;
     Ok(())
 }
 
@@ -114,6 +137,7 @@ async fn run_short(
     cfg:     &TradingBotConfig,
     horizon: &HorizonClient,
     keypair: &Keypair,
+    _kafka:   &KafkaPublisher,
 ) -> Result<()> {
     let ob = horizon.get_order_book(&cfg.trade_asset, &common::Asset::native(), 5).await?;
 
@@ -184,6 +208,7 @@ async fn run_grid(
     cfg:     &TradingBotConfig,
     horizon: &HorizonClient,
     keypair: &Keypair,
+    _kafka:   &KafkaPublisher,
 ) -> Result<()> {
     let ob = horizon.get_order_book(&cfg.trade_asset, &common::Asset::native(), 3).await?;
 
@@ -247,6 +272,7 @@ async fn run_dca(
     cfg:     &TradingBotConfig,
     horizon: &HorizonClient,
     keypair: &Keypair,
+    _kafka:   &KafkaPublisher,
 ) -> Result<()> {
     let interval = Duration::from_secs(cfg.dca_interval_secs);
     info!(

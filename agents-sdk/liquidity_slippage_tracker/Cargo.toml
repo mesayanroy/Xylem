@@ -1,13 +1,13 @@
 [package]
-name        = "mev_bot"
-description = "Stellar DEX MEV bot — front-runs large order-book imbalances"
+name        = "liquidity_slippage_tracker"
+description = "Stellar DEX liquidity depth and price impact (slippage) monitor"
 version.workspace   = true
 edition.workspace   = true
 authors.workspace   = true
 license.workspace   = true
 
 [[bin]]
-name = "mev_bot"
+name = "liquidity_slippage_tracker"
 path = "src/main.rs"
 
 [dependencies]

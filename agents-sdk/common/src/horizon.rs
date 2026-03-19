@@ -9,9 +9,9 @@
 //! - Retries are capped at 5 attempts with jittered exponential back-off.
 //! - Streaming responses are parsed line-by-line without buffering the entire body.
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use futures_util::StreamExt;
-use reqwest::{Client, Response};
+use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -41,6 +41,14 @@ impl Asset {
         Asset::Credit {
             asset_code:   code.into(),
             asset_issuer: issuer.into(),
+        }
+    }
+
+    /// Returns a short human-readable asset code (e.g. "XLM", "USDC").
+    pub fn code(&self) -> &str {
+        match self {
+            Asset::Native => "XLM",
+            Asset::Credit { asset_code, .. } => asset_code.as_str(),
         }
     }
 

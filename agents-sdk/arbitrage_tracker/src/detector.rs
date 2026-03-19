@@ -14,9 +14,8 @@ use crate::{
     executor,
 };
 use anyhow::Result;
-use common::{HorizonClient, Keypair, OrderBook};
+use common::{AgentActionEvent, HorizonClient, KafkaPublisher, Keypair, OrderBook};
 use rust_decimal::prelude::ToPrimitive;
-use rust_decimal::Decimal;
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{debug, info, warn};
@@ -44,6 +43,7 @@ pub async fn run_detection_loop(
     cfg:     &ArbConfig,
     horizon: &HorizonClient,
     keypair: &Keypair,
+    kafka:   &KafkaPublisher,
 ) -> Result<()> {
     info!(
         triangles    = cfg.triangles.len(),
@@ -56,7 +56,7 @@ pub async fn run_detection_loop(
     let mut consecutive_errors = 0u32;
 
     loop {
-        match scan_triangles(cfg, horizon, keypair).await {
+        match scan_triangles(cfg, horizon, keypair, kafka).await {
             Ok(n) => {
                 if n > 0 { info!("{n} arbitrage trade(s) executed"); }
                 consecutive_errors = 0;
@@ -76,6 +76,7 @@ async fn scan_triangles(
     cfg:     &ArbConfig,
     horizon: &HorizonClient,
     keypair: &Keypair,
+    kafka:   &KafkaPublisher,
 ) -> Result<u32> {
     let mut executed = 0u32;
 
@@ -103,6 +104,16 @@ async fn scan_triangles(
                 match executor::execute_triangle(cfg, horizon, keypair, &opp, tri).await {
                     Ok(hash) => {
                         info!(tx = %hash, profit = opp.net_profit, "Arbitrage executed");
+                        kafka.publish_action(&AgentActionEvent {
+                            agent_type:   "arbitrage_tracker".into(),
+                            agent_wallet: keypair.public_key.clone(),
+                            action:       "tri_arb".into(),
+                            asset_pair:   Some(format!("{}/{}/{}", tri.asset_a.code(), tri.asset_b.code(), tri.asset_c.code())),
+                            tx_hash:      Some(hash),
+                            profit_xlm:   Some(opp.net_profit),
+                            latency_ms:   None,
+                            created_at:   common::pubsub::now_iso(),
+                        }).await;
                         executed += 1;
                     }
                     Err(e) => warn!("Triangle {tri_idx} execution failed: {e:#}"),
@@ -121,7 +132,7 @@ fn evaluate_triangle(
     ob_bc:   &OrderBook,
     ob_ca:   &OrderBook,
     tri_idx: usize,
-    tri:     &ArbTriangle,
+    _tri:     &ArbTriangle,
     cfg:     &ArbConfig,
 ) -> Option<ArbOpportunity> {
     // Rate for each leg = 1 / best_ask (we are the taker on every hop)

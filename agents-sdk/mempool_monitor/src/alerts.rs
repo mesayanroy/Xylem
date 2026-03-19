@@ -96,7 +96,7 @@ pub fn evaluate(rule: &AlertRule, tx: &SseTransaction) -> Option<AlertEvent> {
 
         // ── Fee surge ────────────────────────────────────────────────────────
         AlertRule::FeeSurge { multiple } => {
-            let fee_charged: f64 = tx.fee_charged.parse().unwrap_or(0.0);
+            let _fee_charged: f64 = tx.fee_charged.parse().unwrap_or(0.0);
             let max_fee:     f64 = tx.max_fee.parse().unwrap_or(0.0);
             // If the declared max_fee is > `multiple` × 100 stroops (base fee) per op
             let per_op_fee = if tx.operation_count > 0 {

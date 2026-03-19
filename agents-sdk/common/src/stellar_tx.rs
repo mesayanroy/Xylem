@@ -15,7 +15,6 @@ use crate::horizon::{Asset, HorizonClient};
 use crate::wallet::Keypair;
 use anyhow::{bail, Result};
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
-use rust_decimal::Decimal;
 use std::str::FromStr;
 use tracing::debug;
 

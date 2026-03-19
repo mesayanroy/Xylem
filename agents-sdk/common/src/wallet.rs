@@ -13,7 +13,6 @@
 //! ```
 
 use crate::config::STROOPS_PER_XLM;
-use anyhow::{bail, Result};
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use crc::{Crc, CRC_16_IBM_3740};
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
